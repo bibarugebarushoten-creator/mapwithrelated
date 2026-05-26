@@ -1,0 +1,677 @@
+<div class="ofgf-scene-map">
+  <style>
+    .ofgf-scene-map {
+      max-width: 1000px;
+      margin: 0 auto;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .map-window {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      border: 3px solid #111;
+      box-shadow: 8px 8px 0 #111;
+      background: #fff6c7;
+    }
+
+    .map-scroll {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      cursor: grab;
+    }
+
+    .map-scroll.dragging {
+      cursor: grabbing;
+      user-select: none;
+    }
+
+    .map-world {
+      position: relative;
+      width: 1150px;
+      height: 860px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255,216,77,.38), transparent 20%),
+        radial-gradient(circle at 70% 52%, rgba(255,80,65,.18), transparent 20%),
+        linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px),
+        #fff6c7;
+      background-size: auto, auto, 54px 54px, 54px 54px;
+      transform-origin: top left;
+      transition: transform .3s ease;
+    }
+
+    .map-scroll.zoomed .map-world {
+      transform: scale(1.22);
+    }
+
+    .map-world::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(#111 1px, transparent 1px);
+      background-size: 12px 12px;
+      opacity: .08;
+      pointer-events: none;
+    }
+
+    .title {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 90;
+      background: #111;
+      color: #ffd84d;
+      padding: 10px 16px;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      transform: rotate(-2deg);
+      box-shadow: 6px 6px 0 #ffd84d;
+      pointer-events: none;
+    }
+
+    .map-controls {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      z-index: 120;
+      display: flex;
+      gap: 8px;
+    }
+
+    .map-controls button,
+    .panel button {
+      background: #ffd84d;
+      border: 2px solid #111;
+      color: #111;
+      font-weight: 900;
+      padding: 8px 12px;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 #111;
+    }
+
+    .article-btn {
+      background: #111;
+      border: 2px solid #111;
+      color: #ffd84d;
+      font-weight: 900;
+      padding: 8px 12px;
+      box-shadow: 3px 3px 0 #ffd84d;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .scene-label {
+      position: absolute;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(0,0,0,.36);
+      font-size: 20px;
+      pointer-events: none;
+    }
+
+    .diy { top: 180px; left: 130px; transform: rotate(-4deg); }
+    .clubs { top: 315px; left: 850px; transform: rotate(3deg); }
+    .heart { top: 610px; left: 540px; transform: rotate(-1deg); }
+    .south { top: 730px; left: 520px; transform: rotate(2deg); }
+
+    .area {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      z-index: 4;
+      text-align: center;
+    }
+
+    .star {
+      display: block;
+      font-size: 56px;
+      line-height: .8;
+      color: #111;
+      text-shadow: 3px 3px 0 #ffd84d, -2px -2px 0 #fff;
+      transition: transform .15s ease;
+    }
+
+    .area:hover .star,
+    .area.active .star {
+      transform: scale(1.18) rotate(12deg);
+      color: #ffd84d;
+      text-shadow: 3px 3px 0 #111, -2px -2px 0 #fff;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-top: 6px;
+      background: white;
+      border: 2px solid #111;
+      padding: 7px 12px;
+      font-weight: 900;
+      font-size: 17px;
+      box-shadow: 4px 4px 0 #111;
+      white-space: nowrap;
+    }
+
+    .shimokita .tag,
+    .shibuya .tag,
+    .yokohama .tag {
+      background: #ffd84d;
+    }
+
+    .panel {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: min(340px, calc(100% - 48px));
+      background: white;
+      border: 3px solid #111;
+      box-shadow: 7px 7px 0 #111;
+      padding: 18px;
+      z-index: 110;
+      transform: rotate(1deg);
+    }
+
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      font-weight: 900;
+      background: #ffd84d;
+      display: inline-block;
+      padding: 2px 8px;
+    }
+
+    .panel p,
+    .panel li {
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .panel ul {
+      margin: 8px 0 14px;
+      padding-left: 18px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      font-size: 22px;
+      font-weight: 900;
+      cursor: pointer;
+      padding: 0 !important;
+    }
+
+    .scribble {
+      position: absolute;
+      color: rgba(0,0,0,.55);
+      font-weight: 900;
+      font-size: 24px;
+      pointer-events: none;
+    }
+
+    .s1 { left: 230px; top: 500px; transform: rotate(-18deg); }
+    .s2 { left: 900px; top: 260px; transform: rotate(12deg); }
+    .s3 { left: 650px; top: 710px; transform: rotate(-9deg); }
+
+    .related-articles {
+      margin-top: 28px;
+      padding: 24px;
+      background: #fff6c7;
+      border: 3px solid #111;
+      box-shadow: 8px 8px 0 #111;
+    }
+
+    .related-articles h2 {
+      margin: 0 0 20px;
+      display: inline-block;
+      background: #111;
+      color: #ffd84d;
+      padding: 8px 14px;
+      font-size: 28px;
+      letter-spacing: -1px;
+      transform: rotate(-1deg);
+    }
+
+    .article-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .article-card {
+      display: block;
+      background: white;
+      border: 3px solid #111;
+      box-shadow: 5px 5px 0 #111;
+      text-decoration: none;
+      color: #111;
+      overflow: hidden;
+      transition: transform .15s ease;
+    }
+
+    .article-card:hover {
+      transform: translateY(-4px) rotate(-1deg);
+    }
+
+    .article-card img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      display: block;
+      border-bottom: 3px solid #111;
+    }
+
+    .article-card-content {
+      padding: 14px;
+    }
+
+    .article-card strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .article-card span {
+      display: block;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 700px) {
+      .map-window {
+        aspect-ratio: 9 / 13;
+      }
+
+      .map-world {
+        width: 1000px;
+        height: 860px;
+      }
+
+      .title {
+        font-size: 24px;
+        top: 14px;
+        left: 14px;
+      }
+
+      .panel {
+        top: 70px;
+        right: 14px;
+        width: 280px;
+      }
+
+      .tag {
+        font-size: 13px;
+        padding: 5px 8px;
+      }
+
+      .star {
+        font-size: 48px;
+      }
+
+      .map-controls {
+        left: 14px;
+        bottom: 14px;
+      }
+
+      .related-articles {
+        padding: 18px;
+      }
+
+      .related-articles h2 {
+        font-size: 22px;
+      }
+
+      .article-card img {
+        height: 145px;
+      }
+    }
+  </style>
+
+  <div class="map-window">
+    <div class="title">TOKYO SCENE MAP</div>
+
+    <div class="panel" id="infoPanel">
+      <button class="close" onclick="hideCard()">×</button>
+      <h3 id="areaTitle">Shimokitazawa</h3>
+      <p id="areaText"></p>
+
+      <div id="venuePage" style="display:none;">
+        <strong>Live houses to check:</strong>
+        <ul id="venueList"></ul>
+      </div>
+
+      <div class="panel-actions">
+        <button id="nextBtn" onclick="showVenues()">Next: live houses</button>
+        <button id="backBtn" onclick="showOverview()" style="display:none;">Back</button>
+        <a id="articleBtn" class="article-btn" href="#" target="_blank">Read article</a>
+      </div>
+    </div>
+
+    <div class="map-controls">
+      <button onclick="zoomMap()">Zoom in</button>
+      <button onclick="resetZoom()">Zoom out</button>
+    </div>
+
+    <div class="map-scroll" id="mapScroll">
+      <div class="map-world">
+        <div class="scene-label diy">DIY / Punk Scene</div>
+        <div class="scene-label clubs">Clubs and Parties</div>
+        <div class="scene-label heart">HEART OF THE LIVE SCENE</div>
+        <div class="scene-label south">South / Port City Scene</div>
+
+        <div class="scribble s1">////</div>
+        <div class="scribble s2">★ ★</div>
+        <div class="scribble s3">zzz</div>
+
+        <button class="area shimokita active" style="left:470px; top:500px;" onclick="showArea('shimokita', this)">
+          <span class="star">★</span>
+          <span class="tag">Shimokitazawa</span>
+        </button>
+
+        <button class="area shibuya" style="left:720px; top:500px;" onclick="showArea('shibuya', this)">
+          <span class="star">★</span>
+          <span class="tag">Shibuya</span>
+        </button>
+
+        <button class="area" style="left:330px; top:275px;" onclick="showArea('koenji', this)">
+          <span class="star">★</span>
+          <span class="tag">Koenji</span>
+        </button>
+
+        <button class="area" style="left:500px; top:250px;" onclick="showArea('asagaya', this)">
+          <span class="star">★</span>
+          <span class="tag">Asagaya</span>
+        </button>
+
+        <button class="area" style="left:660px; top:330px;" onclick="showArea('shinjuku', this)">
+          <span class="star">★</span>
+          <span class="tag">Shinjuku</span>
+        </button>
+
+        <button class="area" style="left:900px; top:435px;" onclick="showArea('roppongi', this)">
+          <span class="star">★</span>
+          <span class="tag">Roppongi</span>
+        </button>
+
+        <button class="area yokohama" style="left:590px; top:780px;" onclick="showArea('yokohama', this)">
+          <span class="star">★</span>
+          <span class="tag">Yokohama</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="relatedArticles" class="related-articles">
+    <h2 id="relatedTitle">Related articles: Shimokitazawa</h2>
+    <div id="articleGrid" class="article-grid"></div>
+  </div>
+
+  <script>
+    const areaInfo = {
+      shimokita: {
+        title: "Shimokitazawa",
+        text: "The heart of Tokyo’s live-house scene: indie bands, small venues, record shops, late trains, and lots of music fans wandering between shows.",
+        venues: ["BASEMENTBAR", "SHELTER", "THREE", "DaisyBar"],
+        article: "#",
+        articles: [
+          {
+            title: "Tokyo Live House Guide: Shimokitazawa",
+            excerpt: "A beginner-friendly guide to Tokyo’s most iconic indie neighborhood.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Shimokitazawa",
+            url: "#"
+          },
+          {
+            title: "Best Indie Venues in Shimokita",
+            excerpt: "Small venues, loud amps, and where to discover new bands.",
+            image: "https://placehold.co/600x400/111111/f4d64e?text=Live+Houses",
+            url: "#"
+          }
+        ]
+      },
+
+      shibuya: {
+        title: "Shibuya",
+        text: "A central hub for bigger indie shows, club nights, touring acts, and polished music events.",
+        venues: ["WWW", "WWW X", "Spotify O-nest", "Club Quattro"],
+        article: "#",
+        articles: [
+          {
+            title: "Late Night Shibuya Music Guide",
+            excerpt: "Clubs, DJs, and crowded live floors deep into the night.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Shibuya",
+            url: "#"
+          }
+        ]
+      },
+
+      koenji: {
+        title: "Koenji",
+        text: "DIY, punk, noise, vintage shops, tiny bars, and underground energy.",
+        venues: ["HIGH", "JIROKICHI", "ShowBoat", "UFO CLUB"],
+        article: "#",
+        articles: [
+          {
+            title: "Koenji Punk Guide",
+            excerpt: "The scrappier side of Tokyo’s underground.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Koenji",
+            url: "#"
+          }
+        ]
+      },
+
+      asagaya: {
+        title: "Asagaya",
+        text: "A community-heavy pocket of the west Tokyo scene.",
+        venues: ["GAMUSO", "Yellow Vision", "Asagaya Loft A"],
+        article: "#",
+        articles: [
+          {
+            title: "Asagaya Scene Notes",
+            excerpt: "Small bars, local crowds, and intimate nights.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Asagaya",
+            url: "#"
+          }
+        ]
+      },
+
+      shinjuku: {
+        title: "Shinjuku",
+        text: "Dense, chaotic, and full of venues.",
+        venues: ["LOFT", "MARZ", "SAMURAI", "Motion"],
+        article: "#",
+        articles: [
+          {
+            title: "A Night Out in Shinjuku",
+            excerpt: "The chaotic center of Tokyo nightlife.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Shinjuku",
+            url: "#"
+          }
+        ]
+      },
+
+      roppongi: {
+        title: "Roppongi",
+        text: "More nightlife-focused: clubs, parties, and bars.",
+        venues: ["EX THEATER", "Bauhaus", "Abbey Road"],
+        article: "#",
+        articles: [
+          {
+            title: "Roppongi After Dark",
+            excerpt: "International nightlife and late-night energy.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Roppongi",
+            url: "#"
+          }
+        ]
+      },
+
+      yokohama: {
+        title: "Yokohama",
+        text: "A little outside central Tokyo, but worth checking for port-city nightlife.",
+        venues: ["F.A.D Yokohama", "B.B. Street", "Thumbs Up"],
+        article: "#",
+        articles: [
+          {
+            title: "Yokohama Music Crawl",
+            excerpt: "Port city jazz bars and indie venues.",
+            image: "https://placehold.co/600x400/f4d64e/111111?text=Yokohama",
+            url: "#"
+          }
+        ]
+      }
+    };
+
+    let currentArea = "shimokita";
+
+    function showArea(area, button) {
+      currentArea = area;
+      showOverview();
+      showRelatedArticles();
+
+      document.querySelectorAll(".area").forEach(el => el.classList.remove("active"));
+      button.classList.add("active");
+
+      document.getElementById("infoPanel").style.display = "block";
+    }
+
+    function showOverview() {
+      const area = areaInfo[currentArea];
+
+      document.getElementById("areaTitle").textContent = area.title;
+      document.getElementById("areaText").textContent = area.text;
+      document.getElementById("articleBtn").href = area.article;
+
+      document.getElementById("venuePage").style.display = "none";
+      document.getElementById("nextBtn").style.display = "inline-block";
+      document.getElementById("backBtn").style.display = "none";
+    }
+
+    function showVenues() {
+      const area = areaInfo[currentArea];
+      const venueList = document.getElementById("venueList");
+
+      venueList.innerHTML = "";
+
+      area.venues.forEach(function(venue) {
+        const li = document.createElement("li");
+        li.textContent = venue;
+        venueList.appendChild(li);
+      });
+
+      document.getElementById("areaText").textContent =
+        "A few venues and nightlife spots connected to this area:";
+
+      document.getElementById("venuePage").style.display = "block";
+      document.getElementById("nextBtn").style.display = "none";
+      document.getElementById("backBtn").style.display = "inline-block";
+    }
+
+    function showRelatedArticles() {
+      const area = areaInfo[currentArea];
+      const grid = document.getElementById("articleGrid");
+
+      document.getElementById("relatedTitle").textContent =
+        "Related articles: " + area.title;
+
+      grid.innerHTML = "";
+
+      area.articles.forEach(function(article) {
+        const card = document.createElement("a");
+
+        card.className = "article-card";
+        card.href = article.url;
+        card.target = "_blank";
+
+        card.innerHTML = `
+          <img src="${article.image}" alt="${article.title}">
+          <div class="article-card-content">
+            <strong>${article.title}</strong>
+            <span>${article.excerpt}</span>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function hideCard() {
+      document.getElementById("infoPanel").style.display = "none";
+      document.querySelectorAll(".area").forEach(el => el.classList.remove("active"));
+    }
+
+    function zoomMap() {
+      document.getElementById("mapScroll").classList.add("zoomed");
+    }
+
+    function resetZoom() {
+      document.getElementById("mapScroll").classList.remove("zoomed");
+    }
+
+    const mapScroll = document.getElementById("mapScroll");
+
+    let isDown = false;
+    let startX;
+    let startY;
+    let scrollLeft;
+    let scrollTop;
+
+    mapScroll.addEventListener("mousedown", function(e) {
+      if (e.target.closest("button")) return;
+
+      isDown = true;
+      mapScroll.classList.add("dragging");
+
+      startX = e.pageX - mapScroll.offsetLeft;
+      startY = e.pageY - mapScroll.offsetTop;
+
+      scrollLeft = mapScroll.scrollLeft;
+      scrollTop = mapScroll.scrollTop;
+    });
+
+    mapScroll.addEventListener("mouseleave", stopDragging);
+    mapScroll.addEventListener("mouseup", stopDragging);
+
+    function stopDragging() {
+      isDown = false;
+      mapScroll.classList.remove("dragging");
+    }
+
+    mapScroll.addEventListener("mousemove", function(e) {
+      if (!isDown) return;
+      e.preventDefault();
+
+      const x = e.pageX - mapScroll.offsetLeft;
+      const y = e.pageY - mapScroll.offsetTop;
+
+      const walkX = (x - startX) * 0.35;
+      const walkY = (y - startY) * 1.4;
+
+      mapScroll.scrollLeft = scrollLeft - walkX;
+      mapScroll.scrollTop = scrollTop - walkY;
+    });
+
+    window.addEventListener("load", function() {
+      showOverview();
+      showRelatedArticles();
+
+      mapScroll.scrollLeft = 180;
+      mapScroll.scrollTop = 120;
+    });
+  </script>
+</div>
